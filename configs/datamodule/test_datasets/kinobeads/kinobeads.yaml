@@ -1,0 +1,9 @@
+_target_: conglude.datamodule.ConGLUDeDataset
+
+dataset_dir: ./data/datasets/test_datasets/kinobeads
+dataset_name: kinobeads
+task: tf
+structure_based: false
+split: test
+batch_size: 16
+use_ligand_3d: false
