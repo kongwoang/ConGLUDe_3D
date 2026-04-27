@@ -89,16 +89,40 @@ def stage_files(raw_dir: str, pdb_dir: str, ligand_dir: str, ids: list,
     os.makedirs(pdb_dir, exist_ok=True)
     os.makedirs(ligand_dir, exist_ok=True)
 
-    # Build a flat map: lowercase pdb_id -> source folder
+    # Build a flat map: lowercase pdb_id -> source folder.
+    # Supports both PDBbind layouts:
+    #   (A) year-bucketed:  <raw_dir>/{1981-2000,2001-2010,2011-2019}/<entry>/
+    #   (B) flat general:   <raw_dir>/<entry>/  (e.g. PDBbind_v2020 general set)
+    # An "entry folder" is detected by the presence of <entry>_protein.pdb.
+    def looks_like_entry(d):
+        try:
+            return any(f.endswith("_protein.pdb") for f in os.listdir(d))
+        except OSError:
+            return False
+
     src_map = {}
-    for sub in os.listdir(raw_dir):
-        sub_path = os.path.join(raw_dir, sub)
-        if not os.path.isdir(sub_path):
+    n_flat = n_nested = 0
+    for first in os.listdir(raw_dir):
+        first_path = os.path.join(raw_dir, first)
+        if not os.path.isdir(first_path):
             continue
-        for entry in os.listdir(sub_path):
-            entry_path = os.path.join(sub_path, entry)
-            if os.path.isdir(entry_path):
-                src_map[entry.lower()] = entry_path
+        if looks_like_entry(first_path):
+            # Layout B: this directory is an entry folder itself
+            src_map[first.lower()] = first_path
+            n_flat += 1
+        else:
+            # Layout A: this is a year-bucket; entries are one level deeper
+            for entry in os.listdir(first_path):
+                entry_path = os.path.join(first_path, entry)
+                if os.path.isdir(entry_path):
+                    src_map[entry.lower()] = entry_path
+                    n_nested += 1
+
+    print(f"[stage] discovered {len(src_map)} candidate entry folders in "
+          f"{raw_dir} (flat={n_flat}, year-bucketed={n_nested})")
+    if not src_map:
+        print(f"[stage] WARNING: no entry-style folders (containing *_protein.pdb) "
+              f"found under {raw_dir}", file=sys.stderr)
 
     staged = []
     with open(failed_log, "a") as flog:
