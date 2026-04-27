@@ -173,7 +173,9 @@ def main():
           f"(obabel={n_obabel}, rdkit fallback={n_rdkit})")
 
     if not staged:
-        print("[error] No scPDB entries staged successfully — aborting.", file=sys.stderr)
+        print(f"[error] No scPDB entries staged successfully from {args.raw_dir}. "
+              f"Verify --raw_dir contains <entry>/protein.mol2,ligand.mol2 directories. "
+              f"Aborting before resume logic.", file=sys.stderr)
         sys.exit(1)
 
     # Random train/val split

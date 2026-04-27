@@ -215,6 +215,13 @@ def main():
     staged_set = set(staged)
     print(f"Successfully staged {len(staged)} / {len(union_ids)}")
 
+    if not staged:
+        print(f"[error] No raw PDBbind entries were staged from {args.raw_dir}. "
+              f"Verify --raw_dir points at the directory containing entry folders "
+              f"(each with <pdb_id>_protein.pdb and <pdb_id>_ligand.mol2). "
+              f"Aborting before resume logic.", file=sys.stderr)
+        sys.exit(1)
+
     # 4. Filter id lists by what was actually staged, and write split files
     train_ids = [p for p in train_ids if p in staged_set]
     val_ids = [p for p in val_ids if p in staged_set]
