@@ -1,0 +1,5 @@
+_target_: conglude.datamodule.DatasetList
+defaults:
+  - _self_
+  - sb_train: sb_train
+  - lb_train: lb_train

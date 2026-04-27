@@ -1,0 +1,20 @@
+_target_: conglude.datamodule.ConGLUDeDataset
+
+dataset_dir: ./data/datasets/train_datasets/merged
+dataset_name: LB_train
+task: train
+structure_based: false
+split: train
+batch_size: 16
+
+# processing options — MERGED has no PDB ligands, only labelled SMILES
+extract_ligands: none
+labeled_smiles: binary
+calc_mol_feats: true
+multi_ligand: false
+
+# Paper §3.2.2: 1 active : 3 inactives ratio per protein per LB batch
+max_num_actives: 4
+inactive_active_ratio: 3
+
+debug: false

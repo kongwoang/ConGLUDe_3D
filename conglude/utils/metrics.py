@@ -115,7 +115,7 @@ class VirtualScreeningMetrics(Metric):
         assert preds.shape == targets.shape == indexes.shape, "Shapes of predictions, labels and indexes do not match in VirtualScreeningMetrics."
 
         preds = torch.flatten(preds)
-        targets = torch.flatten(targets)
+        targets = torch.flatten(targets).long()
         indexes = torch.flatten(indexes)
 
         for i in indexes.unique():
@@ -490,6 +490,20 @@ class PocketPredictionMetrics(Metric):
             int: Number of ligands with at least one atom within the distance threshold.
         """
 
+        # Some datasets/samples do not provide ligand atoms.
+        # In that case DCA is undefined for the sample and contributes 0.
+        if (
+            ligand_coords is None
+            or ligand_batch_index is None
+            or ligand_inds is None
+            or ligand_coords.numel() == 0
+            or ligand_batch_index.numel() == 0
+            or ligand_inds.numel() == 0
+            or pocket_pos_clustered.numel() == 0
+            or pocket_batch_idx.numel() == 0
+        ):
+            return 0
+
          # Pairwise distances between ligand atoms and predicted pockets
         diffs = pocket_pos_clustered[None, :, :] - ligand_coords[:, None, :]
         dists = torch.norm(diffs, dim=-1)  # (N_ligand_atoms, N_pockets)
@@ -812,5 +826,4 @@ class PocketRankingMetrics(Metric):
 
         return results
        
-
 

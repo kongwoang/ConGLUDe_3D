@@ -1,0 +1,85 @@
+ConGLUDe full-data training/eval — manual commands
+====================================================
+
+All commands run from `conglude/`.
+
+----------------------------------------------------
+1. Preprocess (full data, no limits)
+----------------------------------------------------
+
+# PDBbind (full)
+python scripts/preprocess/prepare_pdbbind.py \
+  --raw_dir ../dataset/P-L \
+  --index_file ../dataset/INDEX_general_PL.2020R1.lst \
+  --dataset_dir ./data/datasets/train_datasets/pdbbind \
+  --num_workers 8
+
+# MERGED (full — no --limit_targets, no --limit_per_target)
+python scripts/preprocess/prepare_merged.py \
+  --raw_dir ../dataset/merged_data \
+  --dataset_dir ./data/datasets/train_datasets/merged \
+  --pdb_dir ./data/datasets/train_datasets/merged/raw/pdb_files \
+  --num_workers 8
+
+# scPDB — optional, only if you want to train on PDBbind+scPDB jointly
+python scripts/preprocess/prepare_scpdb.py \
+  --raw_dir ../dataset/scPDB/scPDB \
+  --dataset_dir ./data/datasets/train_datasets/scpdb \
+  --num_workers 8
+
+python scripts/preprocess/merge_sb_datasets.py \
+  --pdbbind_dir ./data/datasets/train_datasets/pdbbind \
+  --scpdb_dir   ./data/datasets/train_datasets/scpdb \
+  --out_dir     ./data/datasets/train_datasets/sb_combined \
+  --neighbors_dir_name 10_neighbors_10.0_cutoff
+
+# To use the merged SB dir, either uncomment the `sb_combined` line in
+# configs/train_full.yaml, or override on the CLI:
+#   python train.py --config-name train_full \
+#     datamodule.train_datasets.sb_train.dataset_dir=./data/datasets/train_datasets/sb_combined
+
+----------------------------------------------------
+2. Train
+----------------------------------------------------
+
+# From scratch
+python train.py --config-name train_full
+
+# Resume from last.ckpt
+python train.py --config-name train_full \
+  resume_from_checkpoint=./checkpoints/conglude_full/last.ckpt
+
+# Optional: enable W&B logging
+#   python train.py --config-name train_full logger=wb logger.name=conglude_full
+
+----------------------------------------------------
+3. Evaluate
+----------------------------------------------------
+
+# Evaluate last.ckpt
+python eval.py --config-name eval_full_best
+
+# Evaluate the best checkpoint (filename only known after training).
+# `callbacks/full.yaml` uses save_top_k=1, so the non-`last.ckpt` file is the best.
+# List it:
+#   ls checkpoints/conglude_full/*.ckpt
+# Then:
+python eval.py --config-name eval_full_best \
+  ckpt_path=./checkpoints/conglude_full/epoch=NNN-step=MMM.ckpt
+
+# Alternative — use per-component .pth flow (matches checkpoints/best_model layout)
+python eval.py --config-name eval_full_best \
+  ckpt_path=null checkpoint_name=conglude_full
+
+----------------------------------------------------
+Output paths
+----------------------------------------------------
+checkpoints/conglude_full/last.ckpt
+checkpoints/conglude_full/epoch=NNN-step=MMM.ckpt   (best, save_top_k=1)
+checkpoints/conglude_full/{vnegnn,protein_encoder,pocket_encoder,ligand_encoder}.pth
+checkpoints/conglude_full/{vnegnn,protein_encoder,pocket_encoder,ligand_encoder}_config.json
+
+Logs:
+  outputs/<date>/<time>/        # Hydra run dir
+  lightning_logs/               # default Lightning CSVLogger
+  (W&B only if logger=wb is set on CLI)

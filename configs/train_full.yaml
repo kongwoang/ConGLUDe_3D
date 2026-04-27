@@ -1,0 +1,86 @@
+# Full-data ConGLUDe training config.
+#
+# Run from `conglude/`:
+#   python train.py --config-name train_full
+#
+# Resume:
+#   python train.py --config-name train_full \
+#     resume_from_checkpoint=./checkpoints/conglude_full/last.ckpt
+#
+# Datasets bundled here (full, no `--limit*`):
+#   - SB train: PDBbind v2020 R1 (≤2018 train / 2019 val), processed dir
+#                ./data/datasets/train_datasets/pdbbind
+#   - LB train: MERGED (SPRINT) with AlphaFold structures, processed dir
+#                ./data/datasets/train_datasets/merged
+#   - SB val:   PDBbind 2019 (split=val) — same processed dir as SB train
+#
+# scPDB is *not* enabled by default. The repo ships a working merged
+# PDBbind+scPDB processed directory at
+# ./data/datasets/train_datasets/sb_combined (built via
+# scripts/preprocess/merge_sb_datasets.py). To use it, uncomment the
+# `dataset_dir` override under `datamodule.train_datasets.sb_train` below.
+
+defaults:
+  - _self_
+  - datamodule: train
+  - model: conglude
+  - trainer: default
+  - callbacks: full
+  - logger: null
+  - hydra: default
+
+# Validation metric the checkpoint + early-stopping callbacks watch. SB val
+# target_fishing top-1 AUC, matching configs/train.yaml.
+monitor: avg_val/virtual_screening/auc
+
+# Paper §3.2 default. Override on CLI if needed.
+max_epochs: 200
+
+# `checkpoint_name` is the published per-component .pth flow (loads
+# checkpoints/<name>/{vnegnn,protein_encoder,...}.pth). Leave null when
+# training from scratch.
+checkpoint_name: null
+
+# Hydra/W&B run name; surfaces in logs and lightning_logs/.
+run_name: conglude_full
+
+# Set to ./checkpoints/conglude_full/last.ckpt to resume.
+resume_from_checkpoint: null
+
+seed: 0
+debug: false
+precision: highest
+
+# --- explicit dataset paths (full data, no limits) ---
+datamodule:
+  num_workers: 4
+  train_datasets:
+    sb_train:
+      dataset_dir: ./data/datasets/train_datasets/pdbbind
+      # To train on PDBbind + scPDB jointly, swap the line above for:
+      # dataset_dir: ./data/datasets/train_datasets/sb_combined
+      batch_size: 32
+    lb_train:
+      dataset_dir: ./data/datasets/train_datasets/merged
+      batch_size: 16
+  val_datasets:
+    pdbbind_val:
+      dataset_dir: ./data/datasets/train_datasets/pdbbind
+      batch_size: 32
+
+# --- trainer overrides ---
+trainer:
+  max_epochs: ${max_epochs}
+  devices:
+    - 0
+  accelerator: gpu
+  num_sanity_val_steps: 0
+
+# --- checkpointing: explicit dirpath so resume + eval paths are stable ---
+callbacks:
+  model_checkpoint:
+    dirpath: checkpoints/conglude_full
+    save_top_k: 1
+    save_last: true
+    mode: max
+    monitor: ${monitor}

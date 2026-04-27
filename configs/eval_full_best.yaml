@@ -1,0 +1,48 @@
+# Full eval against the conglude_full training run.
+#
+# Default loads `last.ckpt` because the best-epoch filename is only known
+# after training finishes. Once the best epoch is identified (e.g.
+# `epoch=187-step=...ckpt`), either:
+#   1. Override on CLI:
+#        python eval.py --config-name eval_full_best \
+#          ckpt_path=./checkpoints/conglude_full/epoch=187-step=NNN.ckpt
+#   2. Or edit `ckpt_path` below.
+#
+# After training, `checkpoints/conglude_full/` will also contain
+# per-component .pth files (vnegnn.pth, protein_encoder.pth,
+# pocket_encoder.pth, ligand_encoder.pth) plus *_config.json — the
+# published-checkpoint flow. To use that flow instead of a Lightning
+# .ckpt, set:
+#     ckpt_path: null
+#     checkpoint_name: conglude_full
+# (eval.py treats `checkpoint_name` as the directory under ./checkpoints/.)
+#
+# `task: all` is intentionally *not* used: the per-dataset configs under
+# datamodule/test_datasets/* keep their own `task` (`vs`, `pr`, ...) which
+# avoids the known `protein_preds` issue in the all-tasks eval path.
+
+defaults:
+  - _self_
+  - datamodule: eval
+  - model: conglude
+  - trainer: default
+  - logger: null
+  - hydra: default
+
+# Lightning .ckpt path produced by train_full.yaml.
+ckpt_path: ./checkpoints/conglude_full/last.ckpt
+
+# When loading a Lightning .ckpt via `ckpt_path`, leave `checkpoint_name`
+# null. eval.py loads the state dict directly with weights_only=False.
+checkpoint_name: null
+
+seed: 0
+debug: false
+precision: highest
+
+trainer:
+  max_epochs: 1
+  devices: 1
+  accelerator: auto
+  num_sanity_val_steps: 0
+  logger: null

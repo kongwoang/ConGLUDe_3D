@@ -54,21 +54,21 @@ class CustomModelCheckpoint(ModelCheckpoint):
     """
     
     def __init__(
-        self, 
-        dirpath: str = None, 
+        self,
+        dirpath: str = None,
         **kwargs: dict,
     ) -> None:
-        
-         # Get the current Weights & Biases run ID
-        run_name = wandb.run.id
 
-        # Append run ID to checkpoint directory
+        # Use the active W&B run ID as a sub-directory when available; fall back
+        # to plain `dirpath` otherwise so this callback works without wandb.
+        run_name = wandb.run.id if wandb.run is not None else None
+
         if dirpath is None:
-            dirpath = f"checkpoints/{run_name}"
-        else:
+            dirpath = f"checkpoints/{run_name}" if run_name else "checkpoints"
+        elif run_name:
             dirpath = f"{dirpath}/{run_name}"
         self.dirpath = dirpath
-        
+
         super().__init__(dirpath=dirpath, **kwargs)
 
 

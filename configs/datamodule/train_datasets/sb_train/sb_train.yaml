@@ -1,0 +1,22 @@
+_target_: conglude.datamodule.ConGLUDeDataset
+
+# Defaults to PDBbind only. To combine PDBbind+scPDB, merge their processed
+# graph_dir contents into a single dataset_dir (see README_RETRAIN.md
+# "Combining PDBbind and scPDB"); then point dataset_dir at that merged dir.
+dataset_dir: ./data/datasets/train_datasets/pdbbind
+dataset_name: SB_train
+task: train
+structure_based: true
+split: train
+batch_size: 32
+
+# processing options
+extract_ligands: from_file
+labeled_smiles: none
+calc_mol_feats: true
+multi_ligand: false
+
+# ligand sampling
+inactive_active_ratio: null
+
+debug: false

@@ -1,0 +1,4 @@
+_target_: conglude.datamodule.DatasetList
+defaults:
+  - _self_
+  - pdbbind_val: pdbbind_val

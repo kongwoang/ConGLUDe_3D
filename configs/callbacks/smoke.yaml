@@ -1,0 +1,12 @@
+# CustomModelCheckpoint emits per-component .pth + _config.json files
+# (matching checkpoints/best_model layout). Works without wandb for smoke runs.
+model_checkpoint:
+  _target_: conglude.utils.lightning.CustomModelCheckpoint
+  monitor: ${monitor}
+  save_top_k: 1
+  mode: max
+  save_last: true
+  dirpath: checkpoints/conglude_smoke
+lr_monitor:
+  _target_: pytorch_lightning.callbacks.LearningRateMonitor
+  logging_interval: epoch

@@ -508,14 +508,20 @@ class PDBGraphProcessor:
             # Generate PDB block in memory
             try:
                 pdb_block = Chem.MolToPDBBlock(mol)
-            except:
-                print(protein_id)
+            except Exception as e:
+                print(f"MolToPDBBlock failed for {protein_id}: {e}")
+                return []
 
             # Parse PDB block
-            structure = self.parser.get_structure("ligand", StringIO(pdb_block))
+            try:
+                structure = self.parser.get_structure("ligand", StringIO(pdb_block))
+            except Exception as e:
+                print(f"PDB parse failed for converted ligand {protein_id}: {e}")
+                return []
 
         else:
             print(f"No ligand file found for {protein_id}.")
+            return []
 
         # Extract residues
         residues = [res for res in structure.get_residues()]
@@ -2118,6 +2124,23 @@ class LigandProcessor:
 
         if self.load_scaler:
             scaler = joblib.load(f"{self.scaler_dir}/robust_scaler_{feature_type}.pkl")
+            # Newer RDKit versions ship additional descriptors, so the live
+            # feature matrix can be wider than the saved scaler expects.
+            # Truncate to match the scaler's feature count to keep downstream
+            # ligand-encoder input dim stable with checkpointed weights.
+            expected = getattr(scaler, "n_features_in_", None)
+            if expected is not None and feature_matrix.shape[1] != expected:
+                if feature_matrix.shape[1] > expected:
+                    print(f"[LigandProcessor] truncating {feature_type} from "
+                          f"{feature_matrix.shape[1]} to {expected} features "
+                          f"(saved scaler dim).")
+                    feature_matrix = feature_matrix[:, :expected]
+                else:
+                    raise ValueError(
+                        f"{feature_type}: live feature dim {feature_matrix.shape[1]} "
+                        f"is smaller than saved scaler dim {expected}. "
+                        f"Set load_scaler=False, save_scaler=True to refit."
+                    )
         else:
             scaler = RobustScaler()
             scaler.fit(feature_matrix)

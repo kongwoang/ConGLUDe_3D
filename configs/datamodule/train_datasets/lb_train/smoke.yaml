@@ -1,0 +1,18 @@
+_target_: conglude.datamodule.ConGLUDeDataset
+
+dataset_dir: ./data/datasets/train_datasets/merged
+dataset_name: LB_train
+task: train
+structure_based: false
+split: train
+batch_size: 2
+
+extract_ligands: none
+labeled_smiles: binary
+calc_mol_feats: true
+multi_ligand: false
+
+max_num_actives: 4
+inactive_active_ratio: 3
+
+debug: true

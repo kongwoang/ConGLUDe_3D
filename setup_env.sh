@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-set -e  # exit on first error
-
-# Name of your environment
+set -e
 ENV_NAME="conglude"
 
 # Create env with correct Python version

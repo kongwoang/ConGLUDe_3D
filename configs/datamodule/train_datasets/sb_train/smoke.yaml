@@ -1,0 +1,15 @@
+_target_: conglude.datamodule.ConGLUDeDataset
+
+dataset_dir: ./data/datasets/train_datasets/pdbbind
+dataset_name: SB_train
+task: train
+structure_based: true
+split: train
+batch_size: 4
+
+extract_ligands: from_file
+labeled_smiles: none
+calc_mol_feats: true
+multi_ligand: false
+
+debug: true   # caps to 10 graphs (see ConGLUDeDataset.get_graph_files)

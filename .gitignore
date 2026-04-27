@@ -1,8 +1,33 @@
-results/
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# Packaging
+ConGLUDe.egg-info/
+*.egg-info/
+build/
+dist/
+
+# Logs / runs / experiment outputs
+logs/
 lightning_logs/
 outputs/
+results/
 wandb/
+*.log
 
-ConGLUDe.egg-info
-*__pycache__
-eval.log
+# Datasets — too large to track in git. Keep `data/common/`, `data/datasets/common/`,
+# and the small reference / example files under `data/datasets/predict_datasets/*/info/`
+# (these are tracked explicitly).
+data/datasets/train_datasets/
+data/datasets/test_datasets/
+data/datasets/predict_datasets/*/raw/
+data/datasets/predict_datasets/*/processed/
+
+# Editor / OS noise
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo

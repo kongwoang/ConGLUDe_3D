@@ -1,0 +1,27 @@
+# Smoke eval: load checkpoints/conglude_smoke/last.ckpt and run all metrics
+# on the small preprocessed PDBbind dataset.
+# Run:  python eval.py --config-name eval_smoke
+defaults:
+  - datamodule: eval_smoke
+  - model: conglude
+  - trainer: default
+  - logger: null
+  - hydra: default
+  - _self_
+
+# The Lightning .ckpt produced by train.py
+ckpt_path: ./checkpoints/conglude_smoke/last.ckpt
+# Don't try to load per-component .pth files (we don't have them; use Lightning ckpt instead)
+checkpoint_name: null
+
+seed: 0
+debug: false
+precision: highest
+
+trainer:
+  max_epochs: 1
+  devices: 1
+  accelerator: auto
+  limit_test_batches: 4
+  num_sanity_val_steps: 0
+  logger: null

@@ -214,7 +214,13 @@ class ConGLUDeModel(pl.LightningModule):
 
         if hasattr(dm, "train_dataloader") and dm.train_dataloader() is not None:
             dataset = dm.train_dataloader().dataset
-            pocket_counters[dataset.dataset_name] = dataset.pocket_counter
+            # MixedDataset exposes per-source counters under the names
+            # process_step() will look up ("SB_train" / "LB_train").
+            if isinstance(dataset, MixedDataset):
+                pocket_counters["SB_train"] = dataset.SB_dataset.pocket_counter
+                pocket_counters["LB_train"] = dataset.LB_dataset.pocket_counter
+            else:
+                pocket_counters[dataset.dataset_name] = dataset.pocket_counter
 
         if hasattr(dm, "val_dataloader"):
             for dataloader in dm.val_dataloader():
@@ -244,14 +250,14 @@ class ConGLUDeModel(pl.LightningModule):
         elif isinstance(dm.train_dataloader().dataset, MixedDataset):
             self.metrics = {
                 "SB_train": {
-                    "virtual_screening": VirtualScreeningMetrics(ef_fractions=[0.05], calc_re=False),
+                    "virtual_screening": VirtualScreeningMetrics(ef_fractions=[0.05]),
                     "target_fishing": TargetFishingMetrics(),
                     "pocket_prediction": PocketPredictionMetrics(calc_iou=False),
                     "pocket_ranking": PocketRankingMetrics(),
                 },
 
                 "LB_train": {
-                    "virtual_screening": VirtualScreeningMetrics(calc_re=False),
+                    "virtual_screening": VirtualScreeningMetrics(),
                 },
             }
 
@@ -259,7 +265,7 @@ class ConGLUDeModel(pl.LightningModule):
         elif dm.train_dataloader().dataset.structure_based:
             self.metrics = {
                 dm.train_dataloader().dataset.dataset_name: {
-                    "virtual_screening": VirtualScreeningMetrics(ef_fractions=[0.05], calc_re=False),
+                    "virtual_screening": VirtualScreeningMetrics(ef_fractions=[0.05]),
                     "target_fishing": TargetFishingMetrics(),
                     "pocket_prediction": PocketPredictionMetrics(calc_iou=False),
                     "pocket_ranking": PocketRankingMetrics(),
@@ -268,7 +274,7 @@ class ConGLUDeModel(pl.LightningModule):
         else:
             self.metrics = {
                 dm.train_dataloader().dataset.dataset_name: {
-                    "virtual_screening": VirtualScreeningMetrics(calc_re=False),
+                    "virtual_screening": VirtualScreeningMetrics(),
                 }
             }
 
@@ -278,14 +284,14 @@ class ConGLUDeModel(pl.LightningModule):
             
             if dataloader.dataset.structure_based:
                 self.metrics[name] = {
-                    "virtual_screening": VirtualScreeningMetrics(ef_fractions=[0.05], calc_re=False),
+                    "virtual_screening": VirtualScreeningMetrics(ef_fractions=[0.05]),
                     "target_fishing": TargetFishingMetrics(),
                     "pocket_prediction": PocketPredictionMetrics(calc_iou=False),
                     "pocket_ranking": PocketRankingMetrics(),
                 }
             else:
                 self.metrics[name] = {
-                    "virtual_screening": VirtualScreeningMetrics(calc_re=False),
+                    "virtual_screening": VirtualScreeningMetrics(),
                 }
 
         # Add metrics for each test dataset based on its task
@@ -935,7 +941,7 @@ class ConGLUDeModel(pl.LightningModule):
                 # Ligand-based virtual screening loss
                 if dataset_specs["task"] in ["train", "val"] and self.LB_virtual_screening_loss_weight != 0:
 
-                    LB_virtual_screening_loss = self.LB_virtual_screening_loss(vs_preds, labels) # , ligand_batch_idx)
+                    LB_virtual_screening_loss = self.LB_virtual_screening_loss(vs_preds, labels.float()) # , ligand_batch_idx)
                     loss_dict["LB_virtual_screening_loss"] = LB_virtual_screening_loss
                     
                     loss += self.LB_virtual_screening_loss_weight * LB_virtual_screening_loss
@@ -1328,9 +1334,17 @@ class ConGLUDeModel(pl.LightningModule):
         if self.lr_scheduler.func == PlateauWithWarmup:
             lr_scheduler = self.lr_scheduler(optimizer)
 
+            # Find the metric to monitor: first callback with a `monitor`
+            # attribute (typically ModelCheckpoint / EarlyStopping).
+            monitor = None
+            for cb in self.trainer.callbacks:
+                if getattr(cb, "monitor", None):
+                    monitor = cb.monitor
+                    break
+
             optimizer_config["lr_scheduler"] = {
                 "scheduler": lr_scheduler,
-                "monitor": self.trainer.callbacks[0].monitor,
+                "monitor": monitor,
                 "interval": "epoch",
                 "frequency": self.trainer.check_val_every_n_epoch,
                 "reduce_on_plateau": True,

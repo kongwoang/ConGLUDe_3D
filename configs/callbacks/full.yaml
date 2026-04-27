@@ -1,0 +1,19 @@
+# Full-train callbacks: CustomModelCheckpoint emits per-component .pth +
+# _config.json files (matching checkpoints/best_model layout) so the saved
+# checkpoint can be consumed directly by predict.py / eval.py without
+# additional unpacking. Works with or without an active wandb run.
+model_checkpoint:
+  _target_: conglude.utils.lightning.CustomModelCheckpoint
+  monitor: ${monitor}
+  save_top_k: 1
+  mode: max
+  save_last: true
+  dirpath: checkpoints/conglude_full
+early_stopping:
+  _target_: pytorch_lightning.callbacks.EarlyStopping
+  monitor: ${monitor}
+  patience: 15
+  mode: max
+lr_monitor:
+  _target_: pytorch_lightning.callbacks.LearningRateMonitor
+  logging_interval: epoch

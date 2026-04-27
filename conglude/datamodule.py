@@ -155,6 +155,10 @@ class ConGLUDeDataset(Dataset):
         # Basic dataset configuration
         self.dataset_dir = dataset_dir
         self.dataset_name = dataset_name
+        # `name` is checked by PLDataModule to identify SB_train / LB_train datasets,
+        # `split` is read by get_graph_files() in debug mode.
+        self.name = dataset_name
+        self.split = split
         self.task = task
         self.structure_based = structure_based
 
@@ -470,7 +474,7 @@ class ConGLUDeDataset(Dataset):
                 sampled_inactive_inds = random.sample(inactive_inds, n_inactives)
 
                 ligand_idx = np.array(sampled_active_inds + sampled_inactive_inds)
-                labels = torch.cat([torch.ones(len(sampled_active_inds)), torch.zeros(len(sampled_inactive_inds))]).lon()
+                labels = torch.cat([torch.ones(len(sampled_active_inds)), torch.zeros(len(sampled_inactive_inds))]).long()
 
             # Load ligand features
             if self.memmap:
@@ -635,6 +639,12 @@ class MixedDataset(IterableDataset):
 
         # Combine pocket counters of both datasets
         self.pocket_counter = LB_dataset.pocket_counter + SB_dataset.pocket_counter
+
+        # Keep a handle on the underlying datasets so callers can recover
+        # per-source pocket counters / metadata under the "SB_train" and "LB_train" keys.
+        self.LB_dataset = LB_dataset
+        self.SB_dataset = SB_dataset
+        self.dataset_name = "Mixed"
 
 
     def __iter__(

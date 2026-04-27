@@ -1,0 +1,28 @@
+# Smoke-test config: tiny SB+LB datasets, 1 epoch, very few batches.
+# Run:  python train.py --config-name train_smoke
+defaults:
+  - datamodule: train_smoke
+  - model: conglude
+  - trainer: default
+  - callbacks: smoke
+  - logger: null
+  - hydra: default
+  - _self_   # _self_ last so the trainer overrides below win
+
+monitor: avg_val/virtual_screening/auc
+max_epochs: 1
+checkpoint_name: null
+run_name: conglude_smoke
+resume_from_checkpoint: null
+
+seed: 0
+debug: true
+precision: highest
+
+trainer:
+  max_epochs: 1
+  limit_train_batches: 4
+  limit_val_batches: 2
+  num_sanity_val_steps: 0
+  devices: 1
+  accelerator: auto

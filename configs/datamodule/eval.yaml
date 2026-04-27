@@ -4,4 +4,4 @@ defaults:
   - val_datasets: null
   - test_datasets: test_datasets
 
-num_workers: 64
+num_workers: 0

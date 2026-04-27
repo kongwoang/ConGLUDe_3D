@@ -1,0 +1,20 @@
+defaults:
+  - _self_
+  - datamodule: train
+  - model: conglude
+  - trainer: default
+  - callbacks: default
+  - logger: null
+  - hydra: default
+
+# Used by callbacks/default.yaml's monitor key. SB val target_fishing top-1 AUC
+# is a reasonable default; override per task.
+monitor: avg_val/virtual_screening/auc
+max_epochs: 200
+checkpoint_name: null      # if non-null, model loads pretrained weights from checkpoints/<checkpoint_name>/
+run_name: conglude_retrain
+resume_from_checkpoint: null
+
+seed: 0
+debug: false
+precision: highest

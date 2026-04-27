@@ -1,0 +1,7 @@
+_target_: conglude.datamodule.PLDataModule
+defaults:
+  - train_datasets: smoke
+  - val_datasets: pdbbind_val
+  - test_datasets: null
+
+num_workers: 0
