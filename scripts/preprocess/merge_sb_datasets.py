@@ -2,13 +2,14 @@
 Merge processed PDBbind and scPDB graph datasets into a single SB train dir.
 
 Why: ConGLUDe paper trains on PDBbind+scPDB jointly, but `PLDataModule` only
-accepts ONE structure-based train dataset. Easiest fix is to symlink the
-already-processed `.pt` graph files (and ligand metadata) into a combined
-dataset_dir and use that as the SB_train dataset_dir.
+accepts ONE structure-based train dataset. This script writes remapped `.pt`
+graph files and ligand metadata into a combined dataset_dir and uses that as
+the SB_train dataset_dir.
 
 This script does NOT re-run feature extraction — it expects both source dirs
 to already be processed by `prepare_pdbbind.py` and `prepare_scpdb.py`. It
-links/copies graph files, unions ligand metadata, and writes joint split files.
+rewrites graph files with union ligand indices, unions ligand metadata, and
+writes joint split files.
 
 Note: ligand fingerprints/descriptors are tied to per-dataset SMILES indexing.
 Combining ligands across datasets requires re-running LigandProcessor on the
@@ -18,9 +19,10 @@ union. We do that automatically here.
 import argparse
 import json
 import os
-import shutil
 import sys
 from pathlib import Path
+
+import torch
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
@@ -38,33 +40,10 @@ def parse_args():
     parser.add_argument("--neighbors_dir_name", default="10_neighbors_10.0_cutoff",
                         help="Subdir name under processed/graphs (must match the cutoff/neighbors used)")
     parser.add_argument("--copy", action="store_true",
-                        help="Copy graph files instead of symlinking (use on filesystems without symlinks)")
+                        help="Deprecated; merged graph files are always materialized so ligand indices can be remapped.")
     parser.add_argument("--num_workers", type=int, default=8)
     parser.add_argument("--skip_ligand_processor", action="store_true")
     return parser.parse_args()
-
-
-def link_or_copy(src, dst, copy):
-    if os.path.exists(dst):
-        return
-    if copy:
-        shutil.copy2(src, dst)
-    else:
-        os.symlink(os.path.abspath(src), dst)
-
-
-def merge_graphs(out_graph_dir, src_dirs, copy):
-    n = 0
-    for src in src_dirs:
-        if not os.path.isdir(src):
-            print(f"[warn] graph dir not found: {src}", file=sys.stderr)
-            continue
-        for fname in os.listdir(src):
-            if not fname.endswith(".pt"):
-                continue
-            link_or_copy(os.path.join(src, fname), os.path.join(out_graph_dir, fname), copy)
-            n += 1
-    return n
 
 
 def merge_id_lists(out_info, src_infos, file_name):
@@ -76,6 +55,10 @@ def merge_id_lists(out_info, src_infos, file_name):
     union = sorted(union)
     write_list_to_txt(os.path.join(out_info, file_name), union)
     return len(union)
+
+
+def remap_ligand_indices(indices, old_index2smiles, new_smiles):
+    return [new_smiles[old_index2smiles[str(int(i))]] for i in indices]
 
 
 def merge_index2smiles(src_dirs, out_dir):
@@ -100,6 +83,37 @@ def merge_index2smiles(src_dirs, out_dir):
     return new_smiles
 
 
+def merge_graphs(out_graph_dir, src_roots, neighbors_dir_name, new_smiles):
+    n = 0
+    for src in src_roots:
+        graph_dir = os.path.join(src, "processed", "graphs", neighbors_dir_name)
+        if not os.path.isdir(graph_dir):
+            print(f"[warn] graph dir not found: {graph_dir}", file=sys.stderr)
+            continue
+
+        index2smiles_path = os.path.join(src, "processed", "ligand_embeddings", "index2smiles.json")
+        if not os.path.exists(index2smiles_path):
+            print(f"[warn] no index2smiles.json in {src}; skipping graphs", file=sys.stderr)
+            continue
+        old_index2smiles = read_json(index2smiles_path)
+
+        for fname in os.listdir(graph_dir):
+            if not fname.endswith(".pt"):
+                continue
+
+            dst = os.path.join(out_graph_dir, fname)
+            if os.path.lexists(dst):
+                os.remove(dst)
+
+            graph = torch.load(os.path.join(graph_dir, fname), weights_only=False)
+            graph.actives = remap_ligand_indices(graph.actives, old_index2smiles, new_smiles)
+            graph.inactives = remap_ligand_indices(graph.inactives, old_index2smiles, new_smiles)
+            graph.labeled_ligands = remap_ligand_indices(graph.labeled_ligands, old_index2smiles, new_smiles)
+            torch.save(graph, dst)
+            n += 1
+    return n
+
+
 def main():
     args = parse_args()
 
@@ -110,16 +124,9 @@ def main():
     for d in [out_info, out_graph_dir, out_ligand_dir]:
         os.makedirs(d, exist_ok=True)
 
-    src_graphs = [
-        os.path.join(args.pdbbind_dir, "processed", "graphs", args.neighbors_dir_name),
-        os.path.join(args.scpdb_dir, "processed", "graphs", args.neighbors_dir_name),
-    ]
     src_infos = [os.path.join(args.pdbbind_dir, "info"),
                  os.path.join(args.scpdb_dir, "info")]
     src_roots = [args.pdbbind_dir, args.scpdb_dir]
-
-    n = merge_graphs(out_graph_dir, src_graphs, args.copy)
-    print(f"Linked/copied {n} graph .pt files into {out_graph_dir}")
 
     print("Merging id splits ...")
     n_proc = merge_id_lists(out_info, src_infos, "processed_protein_ids.txt")
@@ -129,7 +136,10 @@ def main():
     print(f"  processed={n_proc} all={n_all} train={n_train} val={n_val}")
 
     # Merge SMILES vocabulary then re-run LigandProcessor on the union
-    merge_index2smiles(src_roots, out_dir)
+    new_smiles = merge_index2smiles(src_roots, out_dir)
+
+    n = merge_graphs(out_graph_dir, src_roots, args.neighbors_dir_name, new_smiles)
+    print(f"Merged {n} graph .pt files into {out_graph_dir}")
 
     if args.skip_ligand_processor:
         print("--skip_ligand_processor set: not running LigandProcessor.")
