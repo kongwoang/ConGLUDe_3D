@@ -2161,14 +2161,21 @@ class LigandProcessor:
 
         if self.save_scaler:
             os.makedirs(os.path.join(self.scaler_dir), exist_ok=True)
-  
+
         smiles_list = [self.index2smiles_dict[str(i)] for i in range(len(self.index2smiles_dict))]
-        
+        if len(smiles_list) == 0:
+            raise ValueError(
+                "No ligand SMILES found in processed/ligand_embeddings/index2smiles.json. "
+                "Check that PDBGraphProcessor extracted at least one valid ligand before "
+                "running LigandProcessor."
+            )
+
         print("Calculate ligand features")
         if self.num_workers > 1:
-            num_batches = int(np.ceil(len(smiles_list)/self.smiles_batch_size))
-            smiles_batches = [smiles_list[i*self.smiles_batch_size : (i+1)*self.smiles_batch_size] for i in range(num_batches-1)]
-            smiles_batches.append(smiles_list[(num_batches-1)*self.smiles_batch_size :])
+            smiles_batches = [
+                smiles_list[i : i + self.smiles_batch_size]
+                for i in range(0, len(smiles_list), self.smiles_batch_size)
+            ]
 
             results = execute_in_parallel(func=self.get_ligand_embeddings, variable_args=smiles_batches, n_jobs=self.num_workers)
             fingerprints_batches, descriptors_batches = zip(*results)
