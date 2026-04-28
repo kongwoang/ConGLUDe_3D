@@ -251,7 +251,7 @@ class PDBGraphProcessor:
     
 
     def handle_error(
-            self, 
+            self,
             protein_id: str, 
             comment: str, 
             ligand_id: str = ""
@@ -280,7 +280,7 @@ class PDBGraphProcessor:
 
 
     def download_pdb(
-        self, 
+        self,
         pdb_id: str, 
     ) -> int:
         """
@@ -360,7 +360,7 @@ class PDBGraphProcessor:
     
     
     def dissect_structure(
-        self, 
+        self,
         structure: Structure.Structure,
         ligand_ids: str = None,
     ) -> Tuple[Dict[str, List[Residue.Residue]], Dict[str, List[Residue.Residue]]]:
@@ -538,8 +538,33 @@ class PDBGraphProcessor:
         return ligands
 
 
+    def get_smiles_from_ligand_file(
+        self,
+        protein_id: str,
+    ) -> Optional[str]:
+        """
+        Load a ligand file directly with RDKit and return its SMILES string.
+
+        This preserves MOL2 bond/order information for datasets such as scPDB,
+        where converting the ligand to PDB residues can make SMILES recovery fail.
+        """
+
+        ligand_dir = os.path.join(self.dataset_dir, "raw", "ligand_files")
+        mol2_path = os.path.join(ligand_dir, f"{protein_id}_ligand.mol2")
+        pdb_path = os.path.join(ligand_dir, f"{protein_id}_ligand.pdb")
+
+        if os.path.exists(mol2_path):
+            mol = Chem.MolFromMol2File(mol2_path, sanitize=False, removeHs=False)
+        elif os.path.exists(pdb_path):
+            mol = Chem.MolFromPDBFile(pdb_path, sanitize=False, removeHs=False)
+        else:
+            return None
+
+        return self.mol2smiles(mol)
+
+
     def get_uniprot_ids(
-            self, 
+            self,
             pdb_id: str
         ) -> Dict[str, str]:
         """
@@ -584,7 +609,7 @@ class PDBGraphProcessor:
     
 
     def get_coord_df(
-            self, 
+            self,
             chain: List[Residue.Residue], 
             chain_id: str
         ) -> pd.DataFrame:
@@ -649,7 +674,7 @@ class PDBGraphProcessor:
     
 
     def filter_ligands(
-        self, 
+        self,
         protein_id: str, 
         ligands: Dict[str, List], 
         ligand_ids: Optional[List[str]] = None
@@ -1190,6 +1215,13 @@ class PDBGraphProcessor:
                 if self.calc_mol_feats:
                     if self.extract_ligands == "from_dict":
                         smiles = self.ligand_dict[protein_id][0]
+                    elif self.extract_ligands == "from_file":
+                        smiles = self.get_smiles_from_ligand_file(protein_id)
+                        if smiles is None or smiles == "":
+                            smiles = self.get_smiles(ligand, ligand_name.split("_")[0])
+                        if smiles is None or smiles == "":
+                            self.handle_error(protein_id, "Ligand could not be parsed to SMILES string.", ligand_name)
+                            continue
                     else:
                         smiles = self.get_smiles(ligand, ligand_name.split("_")[0])
                         if smiles is None or smiles == "":
@@ -1684,7 +1716,7 @@ class PDBGraphProcessor:
         return src_list, dst_list
 
 
-    def get_graph(self, 
+    def get_graph(self,
         complex_object: Dict[str, object]
     ) -> HeteroData:
         """
@@ -1926,7 +1958,7 @@ class LigandProcessor:
         If True, saves the fitted scaler to `scaler_dir` after computing normalization statistics.
     """
 
-    def __init__(self, 
+    def __init__(self,
         dataset_dir: str,
         ecfp_radius: int = 2,
         fp_length: int = 2048,
@@ -1954,7 +1986,7 @@ class LigandProcessor:
 
 
     def calculate_ecfp(
-        self, 
+        self,
         mol: Chem.Mol,
     ) -> torch.Tensor:
         """
@@ -1988,7 +2020,7 @@ class LigandProcessor:
     
 
     def calculate_descriptors(
-        self, 
+        self,
         mol: Chem.Mol,
     ) -> torch.Tensor:
         """
@@ -2067,7 +2099,7 @@ class LigandProcessor:
     
 
     def clean_features(
-        self, 
+        self,
         feature_matrix: torch.Tensor
     ) -> torch.Tensor:
         """        
