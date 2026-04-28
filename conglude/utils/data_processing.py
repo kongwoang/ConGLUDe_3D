@@ -173,6 +173,8 @@ class PDBGraphProcessor:
         self.save_cleaned_pdbs = save_cleaned_pdbs
         self.save_complex_info = save_complex_info
         self.device = device
+        self.smiles2index_dict = {}
+        self.index2smiles_dict = {}
 
         # Save relevant metadata for later use
         self.meta_data_dict = {
@@ -1464,10 +1466,6 @@ class PDBGraphProcessor:
         affinities = []
 
         if self.calc_mol_feats:
-            # Create smiles2index dictionary if it doesn't exist yet
-            if not hasattr(self, "smiles2index_dict"):
-                self.smiles2index_dict = {}
-
             target = complex_object["info_dict"]["target_name"]
 
             if self.labeled_smiles == "binary":
@@ -1521,7 +1519,7 @@ class PDBGraphProcessor:
 
             elif self.labeled_smiles == "affinity":
                     
-                if not hasattr(self, "target2actives_dict"):
+                if not hasattr(self, "target2labeled_dict"):
                     self.target2labeled_dict = {}
                     self.target2affinities_dict = {}
 
